@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="QR Biomédico" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <title>QR Biomédico · Shriners</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- ZXing para escaneo QR desde navegador -->
+  <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+
+  <style>
+    :root {
+      --bg:        #0a0f1e;
+      --surface:   #111827;
+      --card:      #161d2f;
+      --accent:    #00d4ff;
+      --accent2:   #00ff9d;
+      --danger:    #ff4d6d;
+      --warn:      #ffb703;
+      --text:      #e8edf5;
+      --muted:     #5a6a80;
+      --border:    rgba(0,212,255,0.15);
+      --mono:      'Share Tech Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── SCANLINES texture ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px) 20px;
+      overflow-y: auto;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 0 28px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+      flex-shrink: 0;
+    }
+    .header-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .header-text small {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+    }
+    .header-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    /* ── AREA BUTTONS ── */
+    .areas-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .area-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+      text-align: left;
+    }
+    .area-btn:active {
+      transform: scale(0.97);
+      background: rgba(0,212,255,0.08);
+      border-color: var(--accent);
+    }
+    .area-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: rgba(0,212,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .area-info { flex: 1; }
+    .area-name {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 3px;
+    }
+    .area-count {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .area-arrow {
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    /* ── SCAN SCREEN ── */
+    .scan-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 0 20px;
+      flex-shrink: 0;
+    }
+    .back-btn {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .back-btn:active { transform: scale(0.93); }
+
+    .scan-area-label {
+      flex: 1;
+    }
+    .scan-area-label small {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+    }
+    .scan-area-label strong {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    /* ── VIEWFINDER ── */
+    .viewfinder-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      min-height: 0;
+    }
+
+    .viewfinder-box {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      aspect-ratio: 1;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 0 0 1px var(--border), 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    #preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Corner brackets */
+    .corner {
+      position: absolute;
+      width: 28px; height: 28px;
+      border-color: var(--accent);
+      border-style: solid;
+      z-index: 2;
+    }
+    .corner-tl { top: 14px; left: 14px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .corner-tr { top: 14px; right: 14px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .corner-bl { bottom: 14px; left: 14px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    .corner-br { bottom: 14px; right: 14px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+    /* Scan line animation */
+    .scan-line {
+      position: absolute;
+      left: 14px; right: 14px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: scanMove 2s ease-in-out infinite;
+      z-index: 3;
+    }
+    @keyframes scanMove {
+      0%   { top: 14px; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { top: calc(100% - 16px); opacity: 0; }
+    }
+
+    .scan-hint {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    /* ── STATUS BADGE ── */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 50px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 1px;
+      border: 1px solid;
+      margin-top: 8px;
+    }
+    .status-badge.scanning {
+      background: rgba(0,212,255,0.08);
+      border-color: rgba(0,212,255,0.3);
+      color: var(--accent);
+    }
+    .status-badge.success {
+      background: rgba(0,255,157,0.08);
+      border-color: rgba(0,255,157,0.3);
+      color: var(--accent2);
+    }
+    .status-badge.error {
+      background: rgba(255,77,109,0.08);
+      border-color: rgba(255,77,109,0.3);
+      color: var(--danger);
+    }
+    .status-badge.warn {
+      background: rgba(255,183,3,0.08);
+      border-color: rgba(255,183,3,0.3);
+      color: var(--warn);
+    }
+
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 900;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .modal-sheet {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 28px 24px calc(env(safe-area-inset-bottom, 0px) + 28px);
+      width: 100%;
+      max-width: 480px;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .modal-overlay.visible .modal-sheet {
+      transform: translateY(0);
+    }
+    .modal-pill {
+      width: 40px; height: 4px;
+      background: var(--muted);
+      border-radius: 2px;
+      margin: 0 auto 24px;
+      opacity: 0.4;
+    }
+    .modal-icon {
+      font-size: 48px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .modal-body {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .modal-code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--accent);
+      display: inline-block;
+      margin-bottom: 20px;
+      width: 100%;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .modal-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.2s;
+      margin-bottom: 10px;
+    }
+    .modal-btn:active { transform: scale(0.97); }
+    .modal-btn.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #0a0f1e;
+    }
+    .modal-btn.secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ SCREEN 1: MENÚ PRINCIPAL ═══════════════ -->
+<div class="screen active" id="screen-menu">
+  <div class="header">
+    <div class="header-icon">🏥</div>
+    <div class="header-text">
+      <small>Hospital Shriners · Biomédica</small>
+      <h1>Sistema QR</h1>
+    </div>
+  </div>
+
+  <p class="section-label">Selecciona área</p>
+
+  <div class="areas-grid" id="areas-grid">
+    <!-- generado por JS -->
+  </div>
+</div>
+
+<!-- ═══════════════ SCREEN 2: ESCÁNER ═══════════════ -->
+<div class="screen" id="screen-scan">
+  <div class="scan-header">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="scan-area-label">
+      <small>Área activa</small>
+      <strong id="scan-area-name">—</strong>
+    </div>
+  </div>
+
+  <div class="viewfinder-wrap">
+    <div class="viewfinder-box">
+      <video id="preview" playsinline autoplay muted></video>
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+      <div class="scan-line"></div>
+    </div>
+
+    <p class="scan-hint">Apunta la cámara al código QR del equipo</p>
+
+    <div class="status-badge scanning" id="status-badge">
+      <div class="pulse-dot"></div>
+      <span id="status-text">BUSCANDO QR...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL ═══════════════ -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-sheet">
+    <div class="modal-pill"></div>
+    <div class="modal-icon" id="modal-icon">✅</div>
+    <div class="modal-title" id="modal-title">Equipo encontrado</div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-code" id="modal-code" style="display:none"></div>
+    <button class="modal-btn primary" id="modal-action-btn">Abrir ficha técnica</button>
+    <button class="modal-btn secondary" onclick="closeModal()">Seguir escaneando</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//   BASE DE DATOS
+// ═══════════════════════════════════════
+const ARCHIVOS = {
+  "Hospitalización": {
+    icon: "🛏️",
+    equipos: {
+      "BASCULA_HOSP_001":  "https://drive.google.com/file/d/1hjf46paT-62ChvhmIBWTPyWcOddDAAUW/view?usp=drive_link",
+      "CAMA_HOSP_002":     "https://drive.google.com/file/d/1vyjGdFzEZntC7_bp1_-ntNzPJslDoi_A/view?usp=drive_link",
+      "CAMILLA_HOSP_003":  "https://drive.google.com/file/d/1eqekxX7QGImguZpFi2qmxNF0k_mR0RDD/view?usp=drive_link",
+      "CUNA_HOSP_004":     "https://drive.google.com/file/d/11jrtyRAV_QIo8Ds0HPvnZ9CBfhF1aCVB/view?usp=drive_link",
+      "ELECT_HOSP_005":    "https://drive.google.com/file/d/1gUiRo_-ajUhDs2TBhmJ8a0YBMqpZCsat/view?usp=drive_link",
+      "ESFIG_HOSP_006":    "https://drive.google.com/file/d/1yxwWyopkZEfY_NVdZFf2MyuOlU8Jxci_/view?usp=drive_link",
+      "VACU_HOSP_007":     "https://drive.google.com/file/d/1kP2Emgi7u0Lv_rwQh_BdIbLwx57dkz3Y/view?usp=drive_link",
+      "MONIT_HOSP_008":    "https://drive.google.com/file/d/14UVqqwQQt1l6SFxObQXc60V1vtG3uUry/view?usp=drive_link",
+      "NEGATO_HOSP_009":   "https://drive.google.com/file/d/1dxjMeDEeEZOehk90jcXpxzo6HT5JG0qN/view?usp=drive_link",
+      "SIERRA_HOSP_0010":  "https://drive.google.com/file/d/1dn_ko65Obrj_Adu9HC9Jtt1T8QCgw-SJ/view?usp=drive_link",
+    }
+  },
+  "CEYE": {
+    icon: "🧪",
+    equipos: {
+      "CEYE001":  "https://drive.google.com/file/d/13l-TcO96Y5z2TrEntJHg9horipT2B6QS/view?usp=drive_link",
+      "CEYE002":  "https://drive.google.com/file/d/1eE8gZRB-fXbm-PjgZEZz4DJDp5ajZfdM/view?usp=drive_link",
+      "CEYE003":  "https://drive.google.com/file/d/1NkdWd53_AsWFceju-Q9s_-ZWO5nZ42fU/view?usp=drive_link",
+      "CEYE004":  "https://drive.google.com/file/d/16zV7T0SzUIIMkHKM9VwujYcJ6Vh0Pl6_/view?usp=drive_link",
+      "CEYE005":  "https://drive.google.com/file/d/1Ne6ctTZ5hNBMi9pUBIlRtxb3cXsjlfV3/view?usp=drive_link",
+      "CEYE006":  "https://drive.google.com/file/d/1X0dN1NDGkgJyC8slw49i1Juy698LGwsp/view?usp=drive_link",
+      "CEYE007":  "https://drive.google.com/file/d/14UB9-_trwQ_7S9PCx9oCQ4izbyH5bvwl/view?usp=drive_link",
+      "CEYE008":  "https://drive.google.com/file/d/1VIdMtgDj2P9LlktY-eFT3Xb626HJxt55/view?usp=drive_link",
+      "CEYE009":  "https://drive.google.com/file/d/1bqTsgEk5CtPpjXmf9_G8bw_5XV8kXfkt/view?usp=drive_link",
+      "CEYE0010": "https://drive.google.com/file/d/1QSmk5hWa50d5yVoRV2p0HTLHiHhb-bdf/view?usp=drive_link",
+    }
+  },
+  "Urgencias": {
+    icon: "🚨",
+    equipos: {
+      "URG001":  "https://drive.google.com/file/d/1rv2GfGdhwMNJ_R5kOc-ERjQCCF-H6uuO/view?usp=drive_link",
+      "URG002":  "https://drive.google.com/file/d/1DUsMnmeThQ_PN3wVmwtx_VOqoHxUoer7/view?usp=drive_link",
+      "URG003":  "https://drive.google.com/file/d/11c5WIbL-WcQlUUI1N24DEGW1f8HCyVcY/view?usp=drive_link",
+      "URG004":  "https://drive.google.com/file/d/1KOeG103daI19lpbvZ_82roRZUs_coh28/view?usp=drive_link",
+      "URG005":  "https://drive.google.com/file/d/1j6sXH_KWfn0LGq6R0FROL-zo0ou8PKgj/view?usp=drive_link",
+      "URG006":  "https://drive.google.com/file/d/1lU1xjeGani7RbG42dnSe3j1NzD1BKuNl/view?usp=drive_link",
+      "URG007":  "https://drive.google.com/file/d/1Rj-f73vhB_ZiqNlm-Nhy53NiQJGGTxY6/view?usp=drive_link",
+      "URG008":  "https://drive.google.com/file/d/1x69d9F1OtTih-Bc0-z2JxS_Jm5Q7D1e1/view?usp=drive_link",
+      "URG009":  "https://drive.google.com/file/d/1DW7RSswOfu0kB_60ssXHAQFIo1_LcEaJ/view?usp=drive_link",
+      "URG0010": "https://drive.google.com/file/d/1NnQPDCHHPPQ1etAhC_4wV9Nd7_JIbILl/view?usp=drive_link",
+    }
+  },
+  "Consulta Externa": {
+    icon: "🩺",
+    equipos: {
+      "CONS_EXT001":  "https://drive.google.com/file/d/1KEN79eggFs8HtjCFKa07djB7yJDQhS7R/view?usp=drive_link",
+      "CONS_EXT002":  "https://drive.google.com/file/d/1Wv_YI2grsp7PLtib2CFga7qa17j4Ltne/view?usp=drive_link",
+      "CONS_EXT003":  "https://drive.google.com/file/d/1p4xdyaRxOWluKFoB03-PSbX4yKEhHc28/view?usp=drive_link",
+      "CONS_EXT004":  "https://drive.google.com/file/d/1v5ws3XUNwrcwJZcPMJWhcDnXw9TSoCow/view?usp=drive_link",
+      "CONS_EXT005":  "https://drive.google.com/file/d/1gSOpuDKMRMLbzuMiFhOu0m3jpzw_ocHL/view?usp=drive_link",
+      "CONS_EXT006":  "https://drive.google.com/file/d/10g5YduX2PJWSSbiDH0nQfF5yOb5cbUL4/view?usp=drive_link",
+      "CONS_EXT007":  "https://drive.google.com/file/d/1QFeUMX3UNmxdXOoXxJbcHYteSJWhtSG0/view?usp=drive_link",
+      "CONS_EXT008":  "https://drive.google.com/file/d/1GQu4oLy23oktq280l9no3nKw4rIQn4jJ/view?usp=drive_link",
+      "CONS_EXT009":  "https://drive.google.com/file/d/1wc-Q0P1kwQaLgUyVcKFbQO1QZfWbBgLH/view?usp=drive_link",
+      "CONS_EXT0010": "https://drive.google.com/file/d/1Qhrvbf6BqBXaj2RTBHIikoyju-_aGlNm/view?usp=drive_link",
+    }
+  },
+  "Quirófano": {
+    icon: "🔬",
+    equipos: {
+      "QR001":  "https://drive.google.com/drive/folders/1Lnf0b0Gkx-TY3yR1vk_j-Su1D-oq55dz?usp=drive_link",
+      "QR002":  "https://drive.google.com/file/d/17tnt9lBzm8cQMew8yB8d1eGm7FcorYw1/view?usp=drive_link",
+      "QR003":  "https://drive.google.com/file/d/14L47oolvReuk_NoG1jpjDTGv61qpRoEx/view?usp=drive_link",
+      "QR004":  "https://drive.google.com/file/d/1Cbltqoa8XlVrfXOl3jV-B_XOZ7pjMZ-h/view?usp=drive_link",
+      "QR005":  "https://drive.google.com/file/d/1oqwP0uT8t-mk_oiM2Q7vZ8nLxGyvabOD/view?usp=drive_link",
+      "QR006":  "https://drive.google.com/file/d/1enMx9ibUr4hCulkruL3ciBVhfLYcgG6q/view?usp=drive_link",
+      "QR007":  "https://drive.google.com/file/d/1XHkJ29_D3yYYOKu1VHfcLv7WpEDcDFtl/view?usp=drive_link",
+      "QR008":  "https://drive.google.com/file/d/1oajD_3zHOsRpNARhYikMb-z0zIQUrHSI/view?usp=drive_link",
+      "QR009":  "https://drive.google.com/file/d/1AR4XKbCp_vBfZ02AQpDSQqsJjPBNotL7/view?usp=drive_link",
+      "QR0010": "https://drive.google.com/file/d/1NLVAUMQqChH0c7HGc6Jhi0VULcnJtQLS/view?usp=drive_link",
+    }
+  }
+};
+
+// ═══════════════════════════════════════
+//   ESTADO
+// ═══════════════════════════════════════
+let areaActual = null;
+let codeReader  = null;
+let scanning    = false;
+let pendingLink = null;
+
+// ═══════════════════════════════════════
+//   RENDER MENÚ
+// ═══════════════════════════════════════
+function renderMenu() {
+  const grid = document.getElementById('areas-grid');
+  grid.innerHTML = '';
+  for (const [nombre, data] of Object.entries(ARCHIVOS)) {
+    const count = Object.keys(data.equipos).length;
+    const btn = document.createElement('button');
+    btn.className = 'area-btn';
+    btn.innerHTML = `
+      <div class="area-icon">${data.icon}</div>
+      <div class="area-info">
+        <div class="area-name">${nombre}</div>
+        <div class="area-count">${count} equipos registrados</div>
+      </div>
+      <span class="area-arrow">›</span>
+    `;
+    btn.onclick = () => goToScan(nombre);
+    grid.appendChild(btn);
+  }
+}
+
+// ═══════════════════════════════════════
+//   NAVEGACIÓN
+// ═══════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToScan(area) {
+  areaActual = area;
+  document.getElementById('scan-area-name').textContent = area;
+  setStatus('scanning', 'BUSCANDO QR...');
+  showScreen('screen-scan');
+  startScanner();
+}
+
+function goBack() {
+  stopScanner();
+  showScreen('screen-menu');
+}
+
+// ═══════════════════════════════════════
+//   ESCÁNER (ZXing)
+// ═══════════════════════════════════════
+function startScanner() {
+  if (scanning) return;
+  scanning = true;
+
+  codeReader = new ZXing.BrowserMultiFormatReader();
+  codeReader.decodeFromVideoDevice(null, 'preview', (result, err) => {
+    if (result) {
+      const codigo = result.getText().trim();
+      stopScanner();
+      procesarCodigo(codigo);
+    }
+  });
+}
+
+function stopScanner() {
+  if (codeReader) {
+    try { codeReader.reset(); } catch(e) {}
+    codeReader = null;
+  }
+  scanning = false;
+
+  // Apagar cámara limpiamente
+  const video = document.getElementById('preview');
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
+}
+
+// ═══════════════════════════════════════
+//   LÓGICA DE BÚSQUEDA (= tu Python)
+// ═══════════════════════════════════════
+function procesarCodigo(codigo) {
+  const areaData = ARCHIVOS[areaActual];
+  if (!areaData) return;
+
+  const equipos = areaData.equipos;
+
+  // ¿Es un link directo?
+  if (codigo.startsWith('http')) {
+    if (Object.values(equipos).some(v => v.trim() === codigo.trim())) {
+      setStatus('success', '¡QR VÁLIDO!');
+      showSuccess(codigo, codigo);
+    } else {
+      verificarExtraviadoLink(codigo);
+    }
+    return;
+  }
+
+  // ¿Es un código corto?
+  if (codigo in equipos) {
+    const link = equipos[codigo].trim();
+    if (link) {
+      setStatus('success', '¡QR VÁLIDO!');
+      showSuccess(codigo, link);
+    } else {
+      showModal('⏳', 'Sin link asignado', `El equipo <strong>${codigo}</strong> aún no tiene ficha técnica disponible.`, null, codigo);
+    }
+  } else {
+    verificarExtraviado(codigo);
+  }
+}
+
+function verificarExtraviado(codigo) {
+  for (const [area, data] of Object.entries(ARCHIVOS)) {
+    if (codigo in data.equipos || Object.values(data.equipos).some(v => v.trim() === codigo.trim())) {
+      setStatus('error', 'ÁREA INCORRECTA');
+      showModal('⚠️', 'Equipo en área incorrecta',
+        `Este equipo <strong>NO pertenece a ${areaActual}</strong>.<br><br>Está registrado en: <strong>${area}</strong>`,
+        null, codigo);
+      return;
+    }
+  }
+  setStatus('error', 'NO ENCONTRADO');
+  showModal('❌', 'Código no encontrado',
+    `El código escaneado no existe en la base de datos.`, null, codigo);
+}
+
+function verificarExtraviadoLink(link) {
+  for (const [area, data] of Object.entries(ARCHIVOS)) {
+    if (Object.values(data.equipos).some(v => v.trim() === link.trim())) {
+      if (area !== areaActual) {
+        setStatus('error', 'ÁREA INCORRECTA');
+        showModal('⚠️', 'Equipo en área incorrecta',
+          `Este equipo <strong>NO pertenece a ${areaActual}</strong>.<br><br>Está registrado en: <strong>${area}</strong>`,
+          null, link);
+        return;
+      }
+    }
+  }
+  setStatus('error', 'NO ENCONTRADO');
+  showModal('❌', 'Código no encontrado',
+    `El QR escaneado no existe en la base de datos.`, null, link);
+}
+
+// ═══════════════════════════════════════
+//   UI HELPERS
+// ═══════════════════════════════════════
+function setStatus(type, text) {
+  const badge = document.getElementById('status-badge');
+  const span  = document.getElementById('status-text');
+  badge.className = `status-badge ${type}`;
+  span.textContent = text;
+  const dot = badge.querySelector('.pulse-dot');
+  if (type === 'scanning') {
+    if (!dot) {
+      const d = document.createElement('div');
+      d.className = 'pulse-dot';
+      badge.insertBefore(d, span);
+    }
+  } else {
+    if (dot) dot.remove();
+  }
+}
+
+function showSuccess(codigo, link) {
+  pendingLink = link;
+  showModal('✅', 'Equipo encontrado',
+    `Ficha técnica lista para abrir.`,
+    link, codigo);
+}
+
+function showModal(icon, title, body, link, codigo) {
+  document.getElementById('modal-icon').textContent = icon;
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = body;
+
+  const codeEl = document.getElementById('modal-code');
+  const actionBtn = document.getElementById('modal-action-btn');
+
+  if (codigo) {
+    codeEl.textContent = codigo.length > 60 ? codigo.slice(0,57)+'...' : codigo;
+    codeEl.style.display = 'block';
+  } else {
+    codeEl.style.display = 'none';
+  }
+
+  if (link) {
+    actionBtn.style.display = 'block';
+    actionBtn.textContent = '🔗 Abrir ficha técnica';
+    actionBtn.onclick = () => { window.open(link, '_blank'); closeModal(); };
+  } else {
+    actionBtn.style.display = 'none';
+  }
+
+  document.getElementById('modal').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('visible');
+  pendingLink = null;
+  // Reiniciar escáner
+  setTimeout(() => {
+    if (document.getElementById('screen-scan').classList.contains('active')) {
+      setStatus('scanning', 'BUSCANDO QR...');
+      startScanner();
+    }
+  }, 400);
+}
+
+// ═══════════════════════════════════════
+//   INIT
+// ═══════════════════════════════════════
+renderMenu();
+</script>
+</body>
+</html>
