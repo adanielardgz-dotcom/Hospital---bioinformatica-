@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="QR Biomédico" />
   <meta name="theme-color" content="#0a0f1e" />
-  <title>QR Biomédico · Shriners</title>
+  <title>QR Biomédico</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;600;700&display=swap" rel="stylesheet" />
@@ -419,9 +419,9 @@
 <!-- ═══════════════ SCREEN 1: MENÚ PRINCIPAL ═══════════════ -->
 <div class="screen active" id="screen-menu">
   <div class="header">
-    <div class="header-icon">🏥</div>
+    <div class="header-icon" style="font-size:16px; font-family:'Share Tech Mono',monospace; font-weight:bold; color:#0a0f1e;">QR</div>
     <div class="header-text">
-      <small>Hospital Shriners · Biomédica</small>
+      <small>Ingeniería Biomédica</small>
       <h1>Sistema QR</h1>
     </div>
   </div>
@@ -466,7 +466,7 @@
 <div class="modal-overlay" id="modal">
   <div class="modal-sheet">
     <div class="modal-pill"></div>
-    <div class="modal-icon" id="modal-icon">✅</div>
+    <div class="modal-icon" id="modal-icon" style="display:none"></div>
     <div class="modal-title" id="modal-title">Equipo encontrado</div>
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-code" id="modal-code" style="display:none"></div>
@@ -481,7 +481,7 @@
 // ═══════════════════════════════════════
 const ARCHIVOS = {
   "Hospitalización": {
-    icon: "🛏️",
+    icon: "H",
     equipos: {
       "BASCULA_HOSP_001":  "https://drive.google.com/file/d/1hjf46paT-62ChvhmIBWTPyWcOddDAAUW/view?usp=drive_link",
       "CAMA_HOSP_002":     "https://drive.google.com/file/d/1vyjGdFzEZntC7_bp1_-ntNzPJslDoi_A/view?usp=drive_link",
@@ -496,7 +496,7 @@ const ARCHIVOS = {
     }
   },
   "CEYE": {
-    icon: "🧪",
+    icon: "C",
     equipos: {
       "CEYE001":  "https://drive.google.com/file/d/13l-TcO96Y5z2TrEntJHg9horipT2B6QS/view?usp=drive_link",
       "CEYE002":  "https://drive.google.com/file/d/1eE8gZRB-fXbm-PjgZEZz4DJDp5ajZfdM/view?usp=drive_link",
@@ -511,7 +511,7 @@ const ARCHIVOS = {
     }
   },
   "Urgencias": {
-    icon: "🚨",
+    icon: "U",
     equipos: {
       "URG001":  "https://drive.google.com/file/d/1rv2GfGdhwMNJ_R5kOc-ERjQCCF-H6uuO/view?usp=drive_link",
       "URG002":  "https://drive.google.com/file/d/1DUsMnmeThQ_PN3wVmwtx_VOqoHxUoer7/view?usp=drive_link",
@@ -526,7 +526,7 @@ const ARCHIVOS = {
     }
   },
   "Consulta Externa": {
-    icon: "🩺",
+    icon: "CE",
     equipos: {
       "CONS_EXT001":  "https://drive.google.com/file/d/1KEN79eggFs8HtjCFKa07djB7yJDQhS7R/view?usp=drive_link",
       "CONS_EXT002":  "https://drive.google.com/file/d/1Wv_YI2grsp7PLtib2CFga7qa17j4Ltne/view?usp=drive_link",
@@ -541,7 +541,7 @@ const ARCHIVOS = {
     }
   },
   "Quirófano": {
-    icon: "🔬",
+    icon: "Qx",
     equipos: {
       "QR001":  "https://drive.google.com/drive/folders/1Lnf0b0Gkx-TY3yR1vk_j-Su1D-oq55dz?usp=drive_link",
       "QR002":  "https://drive.google.com/file/d/17tnt9lBzm8cQMew8yB8d1eGm7FcorYw1/view?usp=drive_link",
@@ -668,7 +668,7 @@ function procesarCodigo(codigo) {
       setStatus('success', '¡QR VÁLIDO!');
       showSuccess(codigo, link);
     } else {
-      showModal('⏳', 'Sin link asignado', `El equipo <strong>${codigo}</strong> aún no tiene ficha técnica disponible.`, null, codigo);
+      showModal('—', 'Sin link asignado', `El equipo <strong>${codigo}</strong> aún no tiene ficha técnica disponible.`, null, codigo);
     }
   } else {
     verificarExtraviado(codigo);
@@ -679,14 +679,14 @@ function verificarExtraviado(codigo) {
   for (const [area, data] of Object.entries(ARCHIVOS)) {
     if (codigo in data.equipos || Object.values(data.equipos).some(v => v.trim() === codigo.trim())) {
       setStatus('error', 'ÁREA INCORRECTA');
-      showModal('⚠️', 'Equipo en área incorrecta',
+      showModal('!', 'Equipo en área incorrecta',
         `Este equipo <strong>NO pertenece a ${areaActual}</strong>.<br><br>Está registrado en: <strong>${area}</strong>`,
         null, codigo);
       return;
     }
   }
   setStatus('error', 'NO ENCONTRADO');
-  showModal('❌', 'Código no encontrado',
+  showModal('X', 'Código no encontrado',
     `El código escaneado no existe en la base de datos.`, null, codigo);
 }
 
@@ -695,7 +695,7 @@ function verificarExtraviadoLink(link) {
     if (Object.values(data.equipos).some(v => v.trim() === link.trim())) {
       if (area !== areaActual) {
         setStatus('error', 'ÁREA INCORRECTA');
-        showModal('⚠️', 'Equipo en área incorrecta',
+        showModal('!', 'Equipo en área incorrecta',
           `Este equipo <strong>NO pertenece a ${areaActual}</strong>.<br><br>Está registrado en: <strong>${area}</strong>`,
           null, link);
         return;
@@ -703,7 +703,7 @@ function verificarExtraviadoLink(link) {
     }
   }
   setStatus('error', 'NO ENCONTRADO');
-  showModal('❌', 'Código no encontrado',
+  showModal('X', 'Código no encontrado',
     `El QR escaneado no existe en la base de datos.`, null, link);
 }
 
@@ -729,7 +729,7 @@ function setStatus(type, text) {
 
 function showSuccess(codigo, link) {
   pendingLink = link;
-  showModal('✅', 'Equipo encontrado',
+  showModal('OK', 'Equipo encontrado',
     `Ficha técnica lista para abrir.`,
     link, codigo);
 }
@@ -751,7 +751,7 @@ function showModal(icon, title, body, link, codigo) {
 
   if (link) {
     actionBtn.style.display = 'block';
-    actionBtn.textContent = '🔗 Abrir ficha técnica';
+    actionBtn.textContent = 'Abrir ficha técnica';
     actionBtn.onclick = () => { window.open(link, '_blank'); closeModal(); };
   } else {
     actionBtn.style.display = 'none';
